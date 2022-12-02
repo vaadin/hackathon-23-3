@@ -121,7 +121,7 @@ services:
       clickhouse:
         condition: service_healthy
 
-  vaadin-application:
-    build: ../..
-    ports: 
-      - "8080:8080"
+  # vaadin-application:
+  #   build: ../..
+  #   ports: 
+  #     - "8080:8080"
