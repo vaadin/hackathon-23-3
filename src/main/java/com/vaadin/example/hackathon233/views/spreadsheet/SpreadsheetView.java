@@ -98,12 +98,14 @@ public class SpreadsheetView extends VerticalLayout implements Receiver {
         formManager = new FormManager(spreadsheet, userInfo, "spreadsheet");
         formManager.setHighlightHandler(context -> {
             int uiIdFromEvent = parseUIIdFromEvent(context.getPropertyName());
+
+            // we do not want to highlight ourselves
             if (UI.getCurrent().getUIId() != uiIdFromEvent) {
                 UserInfo contextUser = context.getUser();
                 int[] coords = parseCellCoordinatesFromEvent(context.getPropertyName());
 
                 spreadsheet.getElement().executeJs("window.Vaadin.Flow._spreadsheet_collab.onSelect(this, $0, $1, $2, $3, $4)",
-                        contextUser.getId(),
+                        contextUser.getId(), // better use UI id here?
                         coords[0] + 1,
                         coords[1] + 1,
                         contextUser.getColorIndex() % 2 == 0 ? "red" : "green",
