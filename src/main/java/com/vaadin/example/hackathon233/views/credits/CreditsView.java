@@ -38,6 +38,7 @@ import com.vaadin.flow.data.renderer.NumberRenderer;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.PreserveOnRefresh;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
@@ -45,6 +46,7 @@ import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
 @PageTitle("Credits")
 @Route(value = "credits/:creditID?/:action?(edit)", layout = MainLayout.class)
 @RolesAllowed("ADMIN")
+@PreserveOnRefresh
 public class CreditsView extends Div implements BeforeEnterObserver {
 
     private final String CREDIT_ID = "creditID";
@@ -172,6 +174,9 @@ public class CreditsView extends Div implements BeforeEnterObserver {
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
+    	if (event.isRefreshEvent()) {
+    		return;
+    	}
         Optional<UUID> creditId = event.getRouteParameters().get(CREDIT_ID).map(UUID::fromString);
         if (creditId.isPresent()) {
             Optional<Credit> creditFromBackend = creditService.get(creditId.get());
