@@ -17,7 +17,7 @@ For not SigNoz is empty – let's start the application.
 
 ### Demo application
 
-`./mwnv package -Pproduction`
+`./mvnw package -Pproduction`
 
 then the monster 
 
