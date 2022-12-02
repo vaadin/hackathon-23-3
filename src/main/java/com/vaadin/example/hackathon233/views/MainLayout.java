@@ -6,8 +6,8 @@ import com.vaadin.example.hackathon233.data.entity.User;
 import com.vaadin.example.hackathon233.security.AuthenticatedUser;
 import com.vaadin.example.hackathon233.views.about.AboutView;
 import com.vaadin.example.hackathon233.views.chat.ChatView;
+import com.vaadin.example.hackathon233.views.credits.CreditsView;
 import com.vaadin.example.hackathon233.views.helloworld.HelloWorldView;
-import com.vaadin.example.hackathon233.views.masterdetail.MasterDetailView;
 import com.vaadin.example.hackathon233.views.spreadsheet.SpreadsheetView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
@@ -85,8 +85,8 @@ public class MainLayout extends AppLayout {
             nav.addItem(new AppNavItem("Spreadsheet", SpreadsheetView.class, "la la-file-excel"));
 
         }
-        if (accessChecker.hasAccess(MasterDetailView.class)) {
-            nav.addItem(new AppNavItem("Master-Detail", MasterDetailView.class, "la la-columns"));
+        if (accessChecker.hasAccess(CreditsView.class)) {
+            nav.addItem(new AppNavItem("Credits", CreditsView.class, "la la-columns"));
 
         }
         if (accessChecker.hasAccess(ChatView.class)) {

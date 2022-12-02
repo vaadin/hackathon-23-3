@@ -1,6 +1,6 @@
 package com.vaadin.example.hackathon233.data.service;
 
-import com.vaadin.example.hackathon233.data.entity.SamplePerson;
+import com.vaadin.example.hackathon233.data.entity.Credit;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,20 +9,20 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
-public class SamplePersonService {
+public class CreditService {
 
-    private final SamplePersonRepository repository;
+    private final CreditRepository repository;
 
     @Autowired
-    public SamplePersonService(SamplePersonRepository repository) {
+    public CreditService(CreditRepository repository) {
         this.repository = repository;
     }
 
-    public Optional<SamplePerson> get(UUID id) {
+    public Optional<Credit> get(UUID id) {
         return repository.findById(id);
     }
 
-    public SamplePerson update(SamplePerson entity) {
+    public Credit update(Credit entity) {
         return repository.save(entity);
     }
 
@@ -30,7 +30,7 @@ public class SamplePersonService {
         repository.deleteById(id);
     }
 
-    public Page<SamplePerson> list(Pageable pageable) {
+    public Page<Credit> list(Pageable pageable) {
         return repository.findAll(pageable);
     }
 
