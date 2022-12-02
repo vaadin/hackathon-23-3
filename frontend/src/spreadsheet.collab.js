@@ -63,31 +63,30 @@ window.Vaadin.Flow._spreadsheet_collab = {
 
     registerOnScrollListener(spreadsheet) {
         // not yet working well
-        // if(!spreadsheet.__collab_selectListenerRegistered) {
-        //     let area = spreadsheet.shadowRoot.querySelector("div.bottom-right-pane.sheet");
-        //     if (area) {
-        //         spreadsheet.__collab_selectListenerRegistered = true;
-        //         area.addEventListener("scroll", e => this.onScroll(spreadsheet))
-        //     }
-        // }
+        if(!spreadsheet.__collab_selectListenerRegistered) {
+            let area = spreadsheet.shadowRoot.querySelector("div.bottom-right-pane.sheet");
+            if (area) {
+                spreadsheet.__collab_selectListenerRegistered = true;
+                area.addEventListener("scroll", e => this.onScroll(spreadsheet))
+            }
+        }
     },
 
     onScroll(spreadsheet) {
-        console.warn(spreadsheet.__collab);
         // not yet working well
-        // for (const [key, collabElement] of Object.entries(spreadsheet.__collab)) {
-        //     let bcr = collabElement.cell.getBoundingClientRect();
-        //
-        //     let oStyle = collabElement.overlay.style;
-        //     oStyle.left = bcr.x - 1 + "px";
-        //     oStyle.top = bcr.y - 1 + "px";
-        //     oStyle.width = bcr.width - 3 + "px";
-        //     oStyle.height = bcr.height - 3 + "px";
-        //
-        //     let nStyle = collabElement.name.style;
-        //     nStyle.left = oStyle.left;
-        //     nStyle.top = (bcr.y - collabElement.name.getBoundingClientRect().height) + "px";
-        // }
+        for (const [key, collabElement] of Object.entries(spreadsheet.__collab)) {
+            let bcr = collabElement.cell.getBoundingClientRect();
+
+            let oStyle = collabElement.overlay.style;
+            oStyle.left = bcr.x - 1 + "px";
+            oStyle.top = bcr.y - 1 + "px";
+            oStyle.width = bcr.width - 3 + "px";
+            oStyle.height = bcr.height - 3 + "px";
+
+            let nStyle = collabElement.name.style;
+            nStyle.left = oStyle.left;
+            nStyle.top = (bcr.y - collabElement.name.getBoundingClientRect().height) + "px";
+        }
     },
 
 }

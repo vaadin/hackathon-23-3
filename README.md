@@ -1,7 +1,18 @@
-# Hackathon-23-3
+# Hackathon-23-3 - Collaboration Spreadsheet
 
-This project can be used as a starting point to create your own Vaadin application with Spring Boot.
-It contains all the necessary configuration and some placeholder files to get you started.
+This project contains an alpha demo of an integration of Spreadsheet and the Collaboration Kit. 
+It allows multiple users to work on the same spreadsheet. 
+
+Selecting a cell will reflect that "cell selection" on the other spreadsheets. Changing a value will
+update the cell on the other user's spreadsheets.
+
+The cell highlighting is done with special html overlay divs.
+
+Known issues:
+- scrolling does not work (highlight overlay will stay in place - sample solution code is in there, but not yet working 100%)
+- z index issues with written cells
+
+You can go to the spreadsheet view. Use "user" and "admin" in two different browser tabs to see the collab effects.
 
 ## Running the application
 
