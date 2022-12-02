@@ -27,6 +27,7 @@ window.Vaadin.Flow._spreadsheet_collab = {
             oStyle.top = bcr.y - 1 + "px";
             oStyle.width = bcr.width - 3 + "px";
             oStyle.height = bcr.height - 3 + "px";
+            oStyle.zIndex = 2;
 
             let nameDiv = document.createElement("div");
             nameDiv.textContent = name;
@@ -39,6 +40,7 @@ window.Vaadin.Flow._spreadsheet_collab = {
             nStyle.padding = "2px";
             nStyle.fontSize = "0.5rem";
             nStyle.color = "white";
+            nStyle.zIndex = 2;
 
             spreadsheet.shadowRoot.append(overlayDiv, nameDiv);
 
