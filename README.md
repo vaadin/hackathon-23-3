@@ -21,7 +21,7 @@ For not SigNoz is empty – let's start the application.
 
 then the monster 
 
-`java -javaagent:/PATH/TO/vaadin-opentelemetry-javaagent-1.0.0.rc2.jar -Dotel.javaagent.configuration-file=/PATH/TO/agent.properties -jar /PATH/TO/hackathon-23-3-1.0-SNAPSHOT.jar`
+`java -javaagent:vaadin-opentelemetry-javaagent-1.0.0.rc2.jar -Dotel.javaagent.configuration-file=agent.properties -jar target/hackathon-23-3-1.0-SNAPSHOT.jar`
 
 Browse to http://localhost:8080/
 
