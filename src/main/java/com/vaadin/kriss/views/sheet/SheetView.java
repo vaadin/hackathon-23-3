@@ -1,381 +1,315 @@
 package com.vaadin.kriss.views.sheet;
 
-import com.vaadin.flow.component.ClickEvent;
-import com.vaadin.flow.component.ComponentEventListener;
-import com.vaadin.flow.component.Text;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.util.CellAddress;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.CellReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.contextmenu.HasMenuItems;
-import com.vaadin.flow.component.contextmenu.MenuItem;
-import com.vaadin.flow.component.contextmenu.SubMenu;
-import com.vaadin.flow.component.dialog.Dialog;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.menubar.MenuBar;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.spreadsheet.Spreadsheet;
-import com.vaadin.flow.component.spreadsheet.SpreadsheetFilterTable;
-import com.vaadin.flow.component.spreadsheet.SpreadsheetTable;
-import com.vaadin.flow.component.upload.Receiver;
-import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
-import com.vaadin.flow.server.StreamRegistration;
-import com.vaadin.flow.server.StreamResource;
-import com.vaadin.flow.server.VaadinSession;
-import java.awt.Color;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.ClientAnchor;
-import org.apache.poi.ss.usermodel.Comment;
-import org.apache.poi.ss.usermodel.CreationHelper;
-import org.apache.poi.ss.usermodel.Drawing;
-import org.apache.poi.ss.usermodel.Font;
-import org.apache.poi.ss.usermodel.RichTextString;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.ss.util.CellReference;
-import org.apache.poi.xssf.usermodel.XSSFCellStyle;
-import org.apache.poi.xssf.usermodel.XSSFColor;
-import org.apache.poi.xssf.usermodel.XSSFFont;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 @PageTitle("Sheet")
 @Route(value = "spread")
 @RouteAlias(value = "")
-public class SheetView extends VerticalLayout implements Receiver {
+public class SheetView extends VerticalLayout {
 
-    private File uploadedFile;
-    private File previousFile;
+    private static final Logger LOG = LoggerFactory.getLogger(SheetView.class);
+
     private final Spreadsheet spreadsheet;
+    private final CellStyle solidCellStyle;
+
+    private CellRangeAddress gameRange;
+    byte[][] data;
 
     public SheetView() {
         setSizeFull();
 
         spreadsheet = new Spreadsheet();
-        MenuBar menuBar = createMenuBar();
+        solidCellStyle = spreadsheet.getWorkbook().createCellStyle();
+        solidCellStyle.setFillBackgroundColor(IndexedColors.BLACK.getIndex());
+        solidCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        addSelectionListnerToDrawFigures();
+
+        UI.getCurrent().setPollInterval(1000);
+        UI.getCurrent().addPollListener(pollEvent -> {
+            if (gameRange == null || data == null) {
+                return;
+            }
+
+            final int rows = gameRange.getLastRow() - gameRange.getFirstRow() + 1;
+            final int column = gameRange.getLastColumn() - gameRange.getFirstColumn() + 1;
+
+            data = nextGeneration(data, rows, column);
+            renderGame();
+        });
+
+        final MenuBar menuBar = createMenuBar();
 
         add(menuBar, spreadsheet);
     }
 
-    private Logger getLogger() {
-        return LoggerFactory.getLogger(getClass());
-    }
-
-    @Override
-    public OutputStream receiveUpload(String fileName, String mimeType) {
-        try {
-            File file = new File(fileName);
-            file.deleteOnExit();
-            uploadedFile = file;
-            return new FileOutputStream(uploadedFile);
-        } catch (FileNotFoundException e) {
-            getLogger().warn("ERROR reading file " + fileName, e);
-        }
-        return null;
-    }
-
     private MenuBar createMenuBar() {
-        MenuBar menuBar = new MenuBar();
+        final AtomicReference<CellRangeAddress> selectedCells = new AtomicReference<>();
+        spreadsheet.addSelectionChangeListener(e ->
+            selectedCells.set(e.getCellRangeAddresses().stream().findFirst().orElse(null))
+        );
 
-        AtomicReference<CellRangeAddress> selectedCells = new AtomicReference<>();
-        AtomicReference<CellRangeAddress> selectedCellMergedRegion = new AtomicReference<>();
-        AtomicReference<CellReference> selectedCellReference = new AtomicReference<>();
-        spreadsheet.addSelectionChangeListener(e -> {
-            selectedCells.set(e.getCellRangeAddresses().stream().findFirst().orElse(null));
-            selectedCellMergedRegion.set(e.getSelectedCellMergedRegion());
-            selectedCellReference.set(e.getSelectedCellReference());
+        final MenuBar menuBar = new MenuBar();
+        menuBar.addItem("Create Border", event -> {
+            if (selectedCells.get() != null && selectedCells.get().getNumberOfCells() > 1) {
+                updateBorders(selectedCells.get());
+            }
         });
-
-        Dialog uploadFileDialog = createUploadDialog();
-
-        MenuItem fileMenu = menuBar.addItem("File");
-        SubMenu fileSubMenu = fileMenu.getSubMenu();
-        createIconItem(fileSubMenu, VaadinIcon.UPLOAD, "Upload", "Upload", e -> uploadFileDialog.open());
-        createIconItem(fileSubMenu, VaadinIcon.DOWNLOAD, "Download", "Download", e -> downloadSpreadsheetFile());
-
-        MenuItem viewMenu = menuBar.addItem("View");
-        SubMenu viewSubMenu = viewMenu.getSubMenu();
-        createCheckableItem(viewSubMenu, "Grid lines", true,
-                e -> spreadsheet.setGridlinesVisible(e.getSource().isChecked()));
-        createCheckableItem(viewSubMenu, "Column and row headings", true,
-                e -> spreadsheet.setRowColHeadingsVisible(e.getSource().isChecked()));
-        createCheckableItem(viewSubMenu, "Top bar", true,
-                e -> spreadsheet.setFunctionBarVisible(e.getSource().isChecked()));
-        createCheckableItem(viewSubMenu, "Bottom bar", true,
-                e -> spreadsheet.setSheetSelectionBarVisible(e.getSource().isChecked()));
-        createCheckableItem(viewSubMenu, "Report mode", false,
-                e -> spreadsheet.setReportStyle(e.getSource().isChecked()));
-
-        MenuItem formatMenu = menuBar.addItem("Format");
-        SubMenu formatSubMenu = formatMenu.getSubMenu();
-
-        createIconItem(formatSubMenu, VaadinIcon.BOLD, "Bold", "Bold",
-                e -> changeSelectedCellsFont(font -> font.setBold(!font.getBold())));
-        createIconItem(formatSubMenu, VaadinIcon.ITALIC, "Italic", "Italic",
-                e -> changeSelectedCellsFont(font -> font.setItalic(!font.getItalic())));
-
-        MenuItem colorMenu = formatSubMenu.addItem("Color");
-        SubMenu colorSubMenu = colorMenu.getSubMenu();
-
-        MenuItem textColorMenu = colorSubMenu.addItem("Text");
-        textColorMenu.getSubMenu().addItem("Black",
-                e -> changeSelectedCellsFont(font -> font.setColor(new XSSFColor(Color.BLACK, null))));
-        textColorMenu.getSubMenu().addItem("Blue",
-                e -> changeSelectedCellsFont(font -> font.setColor(new XSSFColor(Color.BLUE, null))));
-        textColorMenu.getSubMenu().addItem("Red",
-                e -> changeSelectedCellsFont(font -> font.setColor(new XSSFColor(Color.RED, null))));
-        textColorMenu.getSubMenu().addItem("Green",
-                e -> changeSelectedCellsFont(font -> font.setColor(new XSSFColor(Color.GREEN, null))));
-        textColorMenu.getSubMenu().addItem("Orange",
-                e -> changeSelectedCellsFont(font -> font.setColor(new XSSFColor(Color.ORANGE, null))));
-
-        MenuItem backgroundColorMenu = colorSubMenu.addItem("Background");
-        backgroundColorMenu.getSubMenu().addItem("Light gray", e -> changeSelectedCellsStyle(
-                cellStyle -> cellStyle.setFillBackgroundColor(new XSSFColor(Color.LIGHT_GRAY, null))));
-        backgroundColorMenu.getSubMenu().addItem("White", e -> changeSelectedCellsStyle(
-                cellStyle -> cellStyle.setFillBackgroundColor(new XSSFColor(Color.WHITE, null))));
-        backgroundColorMenu.getSubMenu().addItem("Cyan", e -> changeSelectedCellsStyle(
-                cellStyle -> cellStyle.setFillBackgroundColor(new XSSFColor(Color.CYAN, null))));
-        backgroundColorMenu.getSubMenu().addItem("Pink", e -> changeSelectedCellsStyle(
-                cellStyle -> cellStyle.setFillBackgroundColor(new XSSFColor(Color.PINK, null))));
-        backgroundColorMenu.getSubMenu().addItem("Yellow", e -> changeSelectedCellsStyle(
-                cellStyle -> cellStyle.setFillBackgroundColor(new XSSFColor(Color.YELLOW, null))));
-        backgroundColorMenu.getSubMenu().addItem("Dark gray", e -> changeSelectedCellsStyle(
-                cellStyle -> cellStyle.setFillBackgroundColor(new XSSFColor(Color.DARK_GRAY, null))));
-
-        MenuItem mergeMenu = menuBar.addItem("Merge");
-        SubMenu mergeSubMenu = mergeMenu.getSubMenu();
-
-        mergeSubMenu.addItem("Merge selected", e -> mergeSelectedCells(selectedCells.get()));
-        mergeSubMenu.addItem("Unmerge selected", e -> unmergeSelectedRegion(selectedCellMergedRegion.get()));
-
-        MenuItem miscMenu = menuBar.addItem("Miscellaneous");
-        SubMenu miscSubMenu = miscMenu.getSubMenu();
-        miscSubMenu.addItem("Add comment", e -> addComment(selectedCellReference.get()));
-
-        MenuItem freezePanesMenu = miscSubMenu.addItem("Freeze panes");
-        SubMenu freezePanesSubMenu = freezePanesMenu.getSubMenu();
-        freezePanesSubMenu.addItem("Freeze columns to selected", e -> spreadsheet
-                .createFreezePane(spreadsheet.getLastFrozenRow(), spreadsheet.getSelectedCellReference().getCol()));
-        freezePanesSubMenu.addItem("Freeze rows to selected", e -> spreadsheet
-                .createFreezePane(spreadsheet.getSelectedCellReference().getRow(), spreadsheet.getLastFrozenColumn()));
-        freezePanesSubMenu.addItem("Unfreeze all", e -> spreadsheet.removeFreezePane());
-
-        MenuItem tableMenu = miscSubMenu.addItem("Table");
-        SubMenu tableSubMenu = tableMenu.getSubMenu();
-        tableSubMenu.addItem("Create table", e -> createTable(selectedCells.get()));
+        menuBar.addItem("Start", event ->
+            calculateData()
+        );
 
         return menuBar;
     }
 
-    private Dialog createUploadDialog() {
-        Upload uploadSpreadsheet = new Upload(this);
-
-        Dialog uploadFileDialog = new Dialog();
-        uploadFileDialog.setHeaderTitle("Upload a spreadsheet file");
-        uploadFileDialog.addOpenedChangeListener(e -> {
-            uploadSpreadsheet.clearFileList();
-        });
-        uploadFileDialog.add(uploadSpreadsheet);
-
-        Button openSpreadsheetButton = new Button("Open spreadsheet", ev -> {
-            if (uploadedFile != null) {
-                try {
-                    if (previousFile == null
-                            || !previousFile.getAbsolutePath().equals(uploadedFile.getAbsolutePath())) {
-                        spreadsheet.read(uploadedFile);
-                        previousFile = uploadedFile;
-                        uploadFileDialog.close();
-                    } else {
-                        Notification.show("Please, select a different file.");
-                    }
-                } catch (Exception e) {
-                    getLogger().warn("ERROR reading file " + uploadedFile, e);
-                }
-            } else {
-                Notification.show("Please, select a file to upload first.");
+    private void addSelectionListnerToDrawFigures() {
+        spreadsheet.addSelectionChangeListener(e -> {
+            if (gameRange == null) {
+                return;
             }
+
+            final var optionalCellAddresses = e.getCellRangeAddresses().stream().findFirst();
+            if (optionalCellAddresses.isEmpty()) {
+                tryToDrawSingleCell(e);
+                return;
+            }
+            final CellRangeAddress cellAddresses = optionalCellAddresses.get();
+            if (cellAddresses == gameRange) {
+                return;
+            }
+
+            tryToDrawCellRange(cellAddresses);
         });
-        openSpreadsheetButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelButton = new Button("Cancel", e -> uploadFileDialog.close());
-
-        uploadFileDialog.getFooter().add(cancelButton, openSpreadsheetButton);
-        return uploadFileDialog;
     }
 
-    private void downloadSpreadsheetFile() {
-        try {
-            final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            spreadsheet.write(outputStream);
-            final StreamResource resource = new StreamResource("file.xlsx",
-                    () -> new ByteArrayInputStream(outputStream.toByteArray()));
-            final StreamRegistration registration = VaadinSession.getCurrent().getResourceRegistry()
-                    .registerResource(resource);
-            UI.getCurrent().getPage().open(registration.getResourceUri().toString());
-        } catch (Exception e) {
-            getLogger().warn("Error while processing the file to download", e);
+    private void tryToDrawCellRange(final CellRangeAddress cellAddresses) {
+        final List<Cell> listOfCells = new ArrayList<>();
+        for (final CellAddress cellAddress : cellAddresses) {
+            final CellReference cellRef = new CellReference(spreadsheet.getActiveSheet().getSheetName(), cellAddress.getRow(),
+                    cellAddress.getColumn(), false, false);
+            if (gameRange.containsColumn(cellRef.getCol()) && gameRange.containsRow(cellRef.getRow())) {
+                final Cell cell = drawCell(cellRef);
+                listOfCells.add(cell);
+            }
+        }
+
+        spreadsheet.refreshCells(listOfCells);
+    }
+
+    private Cell drawCell(final CellReference cellRef) {
+        final Cell cell = getOrCreateCell(cellRef);
+        if (cell.getCellStyle().equals(solidCellStyle)) {
+            cell.setCellStyle(spreadsheet.getWorkbook().createCellStyle());
+            cell.setCellValue("");
+        } else {
+            cell.setCellStyle(solidCellStyle);
+            cell.setCellValue("x");
+        }
+        return cell;
+    }
+
+    private void tryToDrawSingleCell(final Spreadsheet.SelectionChangeEvent e) {
+        final CellReference cellRef = e.getSelectedCellReference();
+        if (cellRef != null && gameRange.containsColumn(cellRef.getCol()) && gameRange.containsRow(cellRef.getRow())) {
+            final Cell cell = drawCell(cellRef);
+            spreadsheet.refreshCells(cell);
         }
     }
 
-    private void changeSelectedCellsFont(Consumer<XSSFFont> fontConsumer) {
-        changeSelectedCellsStyle(cellStyle -> {
-            XSSFFont cellFont = (XSSFFont) cloneFont(cellStyle);
-            fontConsumer.accept(cellFont);
-            cellStyle.setFont(cellFont);
-        });
+    private void updateBorders(final CellRangeAddress cellAddresses) {
+        cleanUpGameRange();
+        gameRange = cellAddresses;
+        setBorderOfRegion(gameRange);
     }
 
-    private void changeSelectedCellsStyle(Consumer<XSSFCellStyle> cellStyleConsumer) {
-        final ArrayList<Cell> cellsToRefresh = new ArrayList<>();
-        spreadsheet.getSelectedCellReferences().forEach(cellReference -> {
-            Cell cell = getOrCreateCell(cellReference);
-            CellStyle cellStyle = cell.getCellStyle();
-            XSSFCellStyle newCellStyle = (XSSFCellStyle) spreadsheet.getWorkbook().createCellStyle();
-            newCellStyle.cloneStyleFrom(cellStyle);
+    private void cleanUpGameRange() {
+        if(gameRange == null) {
+            return;
+        }
 
-            cellStyleConsumer.accept(newCellStyle);
-
-            cell.setCellStyle(newCellStyle);
-
-            cellsToRefresh.add(cell);
-        });
-        spreadsheet.refreshCells(cellsToRefresh);
+        final List<Cell> cells = new ArrayList<>();
+        for (final CellAddress cellAddress : gameRange) {
+            final CellReference cellRef = new CellReference(spreadsheet.getActiveSheet().getSheetName(), cellAddress.getRow(),
+                    cellAddress.getColumn(), false, false);
+            if (gameRange.containsColumn(cellRef.getCol()) && gameRange.containsRow(cellRef.getRow())) {
+                final Cell cell = getOrCreateCell(cellRef);
+                final CellStyle cellStyle = spreadsheet.getWorkbook().createCellStyle();
+                cellStyle.setBorderBottom(BorderStyle.NONE);
+                cellStyle.setBorderRight(BorderStyle.NONE);
+                cellStyle.setBorderTop(BorderStyle.NONE);
+                cellStyle.setBorderLeft(BorderStyle.NONE);
+                cell.setCellStyle(cellStyle);
+                cell.setCellValue("");
+                cells.add(cell);
+            }
+        }
+        spreadsheet.refreshCells(cells);
     }
 
-    private Cell getOrCreateCell(CellReference cellRef) {
+    private void setBorderOfRegion(final CellRangeAddress cellAddresses) {
+        final List<Cell> listOfCells = new ArrayList<>();
+        for (final CellAddress cellAddress : cellAddresses) {
+            final CellReference cellRef = new CellReference(spreadsheet.getActiveSheet().getSheetName(), cellAddress.getRow(),
+                    cellAddress.getColumn(), false, false);
+            final Cell cell = getOrCreateCell(cellRef);
+            final CellStyle cellStyle = spreadsheet.getWorkbook().createCellStyle();
+            drawBorderInRange(cell, cellStyle, cellAddresses);
+            listOfCells.add(cell);
+        }
+        spreadsheet.refreshCells(listOfCells);
+    }
+
+    private void calculateData() {
+        if (gameRange == null) {
+            return;
+        }
+        final int rows = gameRange.getLastRow() - gameRange.getFirstRow() + 1;
+        final int column = gameRange.getLastColumn() - gameRange.getFirstColumn() + 1;
+        data = new byte[rows][column];
+
+        for (int i = 0; i < data.length; i++) {
+            for (int j = 0; j < data[i].length; j++) {
+                final Cell cellFromGame = getCellFromGame(i, j);
+                if ("x".equals(cellFromGame.getStringCellValue())) {
+                    data[i][j] = 1;
+                } else {
+                    data[i][j] = 0;
+                }
+            }
+        }
+    }
+
+    private Cell getCellFromGame(final int i, final int j) {
+        final int row = gameRange.getFirstRow() + i;
+        final int column = gameRange.getFirstColumn() + j;
+        final CellReference cellRef = new CellReference(spreadsheet.getActiveSheet().getSheetName(),
+                row, column, false, false);
+        return getOrCreateCell(cellRef);
+    }
+
+    private void renderGame() {
+        final List<Cell> cells = new ArrayList<>();
+        for (int i = 0; i < data.length; i++) {
+            for (int j = 0; j < data[i].length; j++) {
+                final Cell cell = getCellFromGame(i, j);
+                final CellStyle cellStyle = spreadsheet.getWorkbook().createCellStyle();
+                if (data[i][j] == 1) {
+                    //alive
+                    cellStyle.cloneStyleFrom(solidCellStyle);
+                    cell.setCellStyle(cellStyle);
+                    drawBorderInRange(cell, cellStyle, gameRange);
+                    cell.setCellValue("X");
+                } else {
+                    //ded
+                    drawBorderInRange(cell, cellStyle, gameRange);
+                    cell.setCellValue("");
+                }
+
+                cells.add(cell);
+            }
+        }
+        spreadsheet.refreshCells(cells);
+    }
+
+    private void drawBorderInRange(final Cell cell, final CellStyle cellStyle, final CellRangeAddress gameRange) {
+        if (cell.getRow().getRowNum() == gameRange.getFirstRow()) {
+            cellStyle.setBorderTop(BorderStyle.THICK);
+            cellStyle.setTopBorderColor(IndexedColors.BLACK.getIndex());
+        } else if (cell.getRow().getRowNum() == gameRange.getLastRow()) {
+            cellStyle.setBorderBottom(BorderStyle.THICK);
+            cellStyle.setBottomBorderColor(IndexedColors.BLACK.getIndex());
+        }
+
+        if (cell.getColumnIndex() == gameRange.getFirstColumn()) {
+            cellStyle.setBorderLeft(BorderStyle.THICK);
+            cellStyle.setLeftBorderColor(IndexedColors.BLACK.getIndex());
+        } else if (cell.getColumnIndex() == gameRange.getLastColumn()) {
+            cellStyle.setBorderRight(BorderStyle.THICK);
+            cellStyle.setRightBorderColor(IndexedColors.BLACK.getIndex());
+        }
+        cell.setCellStyle(cellStyle);
+    }
+
+    //TODO take style data directly
+    //Copied logic from https://stackoverflow.com/a/70869260
+    public static byte[][] nextGeneration(final byte[][] inputGrid, final int i, final int j) {
+        final byte[][] future = new byte[i][j];
+
+        // iterate over each row (start with 0 because an array index is 0 based)
+        for (int x = 0; x < i; x++) {
+            // iterate over each column (start with 0 as well)
+            for (int y = 0; y < j; y++) {
+                final int aliveNeighbours = getAliveNeighbours(inputGrid, i, j, x, y);
+
+                // simplified logic to remove unnecessary conditions
+                // any cell with three neighbors is alive (past value doesn't matter)
+                if (aliveNeighbours == 3) {
+                    future[x][y] = 1;
+                }
+                // any cell with fewer than two live neighbors is dead (past value doesn't matter)
+                else if (aliveNeighbours < 2) {
+                    future[x][y] = 0;
+                }
+                // any cell with more than three neighbors is dead (past value doesn't matter)
+                else if (aliveNeighbours >= 4) {
+                    future[x][y] = 0;
+                }
+                // any cell with two neighbors remains in its present state (regardless of what the past value was)
+                else {
+                    future[x][y] = inputGrid[x][y];
+                }
+            }
+        }
+        return future;
+    }
+
+    private static int getAliveNeighbours(final byte[][] inputGrid, final int i, final int j, final int x, final int y) {
+        int aliveNeighbours = 0;
+        // the row above is x-1 but never less than 0 because that row doesn't exist
+        final int rowAbove = Math.max(x - 1, 0);
+        // the row below is never greater than the last row in the array (i - 1)
+        final int rowBelow = Math.min(x + 1, i - 1);
+        // go to the left one column, unless we are at the edge, then don't go past 0
+        final int colLeft = Math.max(y - 1, 0);
+        // ... continuing the same logic as above
+        final int colRight = Math.min(y + 1, j - 1);
+        for (int rowToCheck = rowAbove; rowToCheck <= rowBelow; rowToCheck++) {
+            for (int colToCheck = colLeft; colToCheck <= colRight; colToCheck++) {
+                aliveNeighbours += inputGrid[rowToCheck][colToCheck];
+            }
+        }
+
+        // remove the cell being evaluated from the neighbors count
+        aliveNeighbours -= inputGrid[x][y];
+        return aliveNeighbours;
+    }
+
+    private Cell getOrCreateCell(final CellReference cellRef) {
         Cell cell = spreadsheet.getCell(cellRef.getRow(), cellRef.getCol());
         if (cell == null) {
             cell = spreadsheet.createCell(cellRef.getRow(), cellRef.getCol(), "");
         }
         return cell;
-    }
-
-    private Font cloneFont(CellStyle cellstyle) {
-        Font newFont = spreadsheet.getWorkbook().createFont();
-        Font originalFont = spreadsheet.getWorkbook().getFontAt(cellstyle.getFontIndex());
-        if (originalFont != null) {
-            newFont.setBold(originalFont.getBold());
-            newFont.setItalic(originalFont.getItalic());
-            newFont.setFontHeight(originalFont.getFontHeight());
-            newFont.setUnderline(originalFont.getUnderline());
-            newFont.setStrikeout(originalFont.getStrikeout());
-            // This cast an only be done when using .xlsx files
-            XSSFFont originalXFont = (XSSFFont) originalFont;
-            XSSFFont newXFont = (XSSFFont) newFont;
-            newXFont.setColor(originalXFont.getXSSFColor());
-        }
-        return newFont;
-    }
-
-    private MenuItem createCheckableItem(HasMenuItems menu, String item, boolean checked,
-            ComponentEventListener<ClickEvent<MenuItem>> clickListener) {
-        MenuItem menuItem = menu.addItem(item, clickListener);
-        menuItem.setCheckable(true);
-        menuItem.setChecked(checked);
-
-        return menuItem;
-    }
-
-    private MenuItem createIconItem(HasMenuItems menu, VaadinIcon iconName, String label, String ariaLabel,
-            ComponentEventListener<ClickEvent<MenuItem>> clickListener) {
-        Icon icon = new Icon(iconName);
-
-        icon.getStyle().set("width", "var(--lumo-icon-size-s)");
-        icon.getStyle().set("height", "var(--lumo-icon-size-s)");
-        icon.getStyle().set("marginRight", "var(--lumo-space-s)");
-
-        MenuItem item = menu.addItem(icon, clickListener);
-
-        if (ariaLabel != null) {
-            item.getElement().setAttribute("aria-label", ariaLabel);
-        }
-
-        if (label != null) {
-            item.add(new Text(label));
-        }
-
-        return item;
-    }
-
-    private void mergeSelectedCells(CellRangeAddress selectedCells) {
-        if (selectedCells == null) {
-            Notification.show("Please select a region of cells to be merged.");
-            return;
-        }
-        spreadsheet.addMergedRegion(selectedCells);
-    }
-
-    private void unmergeSelectedRegion(CellRangeAddress selectedCellMergedRegion) {
-        if (selectedCellMergedRegion == null) {
-            Notification.show("Please select a merged region of cells to be unmerged.");
-            return;
-        }
-        for (int i = 0; i < spreadsheet.getActiveSheet().getNumMergedRegions(); i++) {
-            CellRangeAddress mergedRegion = spreadsheet.getActiveSheet().getMergedRegion(i);
-            if (selectedCellMergedRegion.getFirstRow() == mergedRegion.getFirstRow()
-                    && selectedCellMergedRegion.getFirstColumn() == mergedRegion.getFirstColumn()) {
-                spreadsheet.removeMergedRegion(i);
-            }
-        }
-    }
-
-    private void addComment(CellReference cellReference) {
-        Cell cell = getOrCreateCell(cellReference);
-        createCellComment(spreadsheet, spreadsheet.getActiveSheet(), cell, cellReference);
-        spreadsheet.refreshCells(cell);
-        spreadsheet.editCellComment(cellReference);
-    }
-
-    private void createCellComment(Spreadsheet spreadsheet, Sheet sheet, Cell cell, CellReference cellRef) {
-        CreationHelper factory = sheet.getWorkbook().getCreationHelper();
-        Drawing<?> drawing = sheet.createDrawingPatriarch();
-
-        ClientAnchor anchor = factory.createClientAnchor();
-        anchor.setCol1(cell.getColumnIndex());
-        anchor.setCol2(cell.getColumnIndex() + 1);
-        anchor.setRow1(cell.getRowIndex());
-        anchor.setRow2(cell.getRowIndex() + 3);
-
-        // Create the comment and set the text+author
-        Comment comment = drawing.createCellComment(anchor);
-        RichTextString str = factory.createRichTextString("");
-        comment.setString(str);
-
-        // Fetch author from provider or fall back to default
-        String author = null;
-        if (spreadsheet.getCommentAuthorProvider() != null) {
-            author = spreadsheet.getCommentAuthorProvider().getAuthorForComment(cellRef);
-        }
-        if (author == null || author.trim().isEmpty()) {
-            author = "Spreadsheet User";
-        }
-        comment.setAuthor(author);
-
-        // Assign the comment to the cell
-        cell.setCellComment(comment);
-    }
-
-    private void createTable(CellRangeAddress cellAddresses) {
-        if (cellAddresses == null) {
-            Notification.show("Please select a region of cells to create the table.");
-            return;
-        }
-        SpreadsheetTable table = new SpreadsheetFilterTable(spreadsheet, cellAddresses);
-        spreadsheet.registerTable(table);
     }
 }

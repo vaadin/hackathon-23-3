@@ -119,6 +119,7 @@
     "@vaadin/virtual-list": "23.3.0-beta1",
     "construct-style-sheets-polyfill": "3.1.0",
     "date-fns": "2.29.3",
+    "line-awesome": "1.3.0",
     "lit": "2.4.1",
     "proj4": "2.8.0"
   },
@@ -257,7 +258,8 @@
     "lit": "$lit",
     "@polymer/polymer": "$@polymer/polymer",
     "proj4": "$proj4",
-    "date-fns": "$date-fns"
+    "date-fns": "$date-fns",
+    "line-awesome": "$line-awesome"
   },
   "vaadin": {
     "dependencies": {
@@ -378,6 +380,7 @@
       "@vaadin/virtual-list": "23.3.0-beta1",
       "construct-style-sheets-polyfill": "3.1.0",
       "date-fns": "2.29.3",
+      "line-awesome": "1.3.0",
       "lit": "2.4.1",
       "proj4": "2.8.0"
     },
@@ -397,6 +400,6 @@
       "workbox-core": "6.5.0",
       "workbox-precaching": "6.5.0"
     },
-    "hash": "a9fa9e5385d0b64c2fb7777c28997c7ad8b010df560248c445c0be9d61e917db"
+    "hash": "6c84035149866ad63e9b6871d7cb30bddbec4354e5d6547af210f12f91f11ed7"
   }
 }
