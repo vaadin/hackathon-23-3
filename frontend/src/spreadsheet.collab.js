@@ -12,7 +12,6 @@ window.Vaadin.Flow._spreadsheet_collab = {
         let cell = spreadsheet.shadowRoot.querySelector(query);
 
         if(cell) {
-            debugger;
             let bcr = cell.getBoundingClientRect();
 
             let overlayDiv = document.createElement('div');
