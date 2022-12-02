@@ -41,7 +41,8 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
     private final String SAMPLEPERSON_ID = "samplePersonID";
     private final String SAMPLEPERSON_EDIT_ROUTE_TEMPLATE = "master-detail/%s/edit";
 
-    private final Grid<SamplePerson> grid = new Grid<>(SamplePerson.class, false);
+    private final Grid<SamplePerson> grid = new Grid<>(SamplePerson.class,
+            false);
 
     private TextField firstName;
     private TextField lastName;
@@ -74,30 +75,52 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
         add(splitLayout);
 
         // Configure Grid
-        grid.addColumn("firstName").setAutoWidth(true);
-        grid.addColumn("lastName").setAutoWidth(true);
+        grid.addColumn(item -> {
+            String name = item.getFirstName() + " " + item.getLastName();
+            if (name.length() > 12)
+                name = item.getFirstName().substring(0, 1) + ". "
+                        + item.getLastName();
+            return name.substring(0, Math.min(12, name.length()));
+        }).setHeader("Name").setAutoWidth(true).setTooltipGenerator(
+                item -> "First name: " + item.getFirstName() + ", Last name: "
+                        + item.getLastName());
         grid.addColumn("email").setAutoWidth(true);
         grid.addColumn("phone").setAutoWidth(true);
-        grid.addColumn("dateOfBirth").setAutoWidth(true);
-        grid.addColumn("occupation").setAutoWidth(true);
-        LitRenderer<SamplePerson> importantRenderer = LitRenderer.<SamplePerson>of(
-                "<vaadin-icon icon='vaadin:${item.icon}' style='width: var(--lumo-icon-size-s); height: var(--lumo-icon-size-s); color: ${item.color};'></vaadin-icon>")
-                .withProperty("icon", important -> important.isImportant() ? "check" : "minus").withProperty("color",
+        grid.addColumn("dateOfBirth").setAutoWidth(true)
+                .setTooltipGenerator(item -> "yyyy-MM-dd");
+        grid.addColumn("occupation").setWidth("10em")
+                .setTooltipGenerator(item -> item.getOccupation());
+        LitRenderer<SamplePerson> importantRenderer = LitRenderer
+                .<SamplePerson> of(
+                        "<vaadin-icon icon='vaadin:${item.icon}' style='width: var(--lumo-icon-size-s); height: var(--lumo-icon-size-s); color: ${item.color};'></vaadin-icon>")
+                .withProperty("icon",
+                        important -> important.isImportant() ? "check"
+                                : "minus")
+                .withProperty("color",
                         important -> important.isImportant()
                                 ? "var(--lumo-primary-text-color)"
                                 : "var(--lumo-disabled-text-color)");
 
-        grid.addColumn(importantRenderer).setHeader("Important").setAutoWidth(true);
+        grid.addColumn(importantRenderer).setHeader("Important")
+                .setAutoWidth(true).setTooltipGenerator(
+                        item -> item.isImportant() ? "This person is important"
+                                : null);
 
-        grid.setItems(query -> samplePersonService.list(
-                PageRequest.of(query.getPage(), query.getPageSize(), VaadinSpringDataHelpers.toSpringDataSort(query)))
-                .stream());
+        grid.setItems(
+                query -> samplePersonService
+                        .list(PageRequest
+                                .of(query.getPage(), query.getPageSize(),
+                                        VaadinSpringDataHelpers
+                                                .toSpringDataSort(query)))
+                        .stream());
         grid.addThemeVariants(GridVariant.LUMO_NO_BORDER);
 
         // when a row is selected or deselected, populate form
         grid.asSingleSelect().addValueChangeListener(event -> {
             if (event.getValue() != null) {
-                UI.getCurrent().navigate(String.format(SAMPLEPERSON_EDIT_ROUTE_TEMPLATE, event.getValue().getId()));
+                UI.getCurrent().navigate(
+                        String.format(SAMPLEPERSON_EDIT_ROUTE_TEMPLATE,
+                                event.getValue().getId()));
             } else {
                 clearForm();
                 UI.getCurrent().navigate(MasterDetailView.class);
@@ -128,7 +151,8 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
                 Notification.show("SamplePerson details stored.");
                 UI.getCurrent().navigate(MasterDetailView.class);
             } catch (ValidationException validationException) {
-                Notification.show("An exception happened while trying to store the samplePerson details.");
+                Notification.show(
+                        "An exception happened while trying to store the samplePerson details.");
             }
         });
 
@@ -136,14 +160,17 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        Optional<UUID> samplePersonId = event.getRouteParameters().get(SAMPLEPERSON_ID).map(UUID::fromString);
+        Optional<UUID> samplePersonId = event.getRouteParameters()
+                .get(SAMPLEPERSON_ID).map(UUID::fromString);
         if (samplePersonId.isPresent()) {
-            Optional<SamplePerson> samplePersonFromBackend = samplePersonService.get(samplePersonId.get());
+            Optional<SamplePerson> samplePersonFromBackend = samplePersonService
+                    .get(samplePersonId.get());
             if (samplePersonFromBackend.isPresent()) {
                 populateForm(samplePersonFromBackend.get());
             } else {
-                Notification.show(
-                        String.format("The requested samplePerson was not found, ID = %s", samplePersonId.get()), 3000,
+                Notification.show(String.format(
+                        "The requested samplePerson was not found, ID = %s",
+                        samplePersonId.get()), 3000,
                         Notification.Position.BOTTOM_START);
                 // when a row is selected but the data is no longer available,
                 // refresh grid
@@ -169,7 +196,8 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
         dateOfBirth = new DatePicker("Date Of Birth");
         occupation = new TextField("Occupation");
         important = new Checkbox("Important");
-        formLayout.add(firstName, lastName, email, phone, dateOfBirth, occupation, important);
+        formLayout.add(firstName, lastName, email, phone, dateOfBirth,
+                occupation, important);
 
         editorDiv.add(formLayout);
         createButtonLayout(editorLayoutDiv);
