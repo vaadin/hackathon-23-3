@@ -1,5 +1,8 @@
 package com.vaadin.example.hackathon233.views;
 
+import java.io.ByteArrayInputStream;
+import java.util.Optional;
+
 import com.vaadin.example.hackathon233.components.appnav.AppNav;
 import com.vaadin.example.hackathon233.components.appnav.AppNavItem;
 import com.vaadin.example.hackathon233.data.entity.User;
@@ -8,7 +11,6 @@ import com.vaadin.example.hackathon233.views.about.AboutView;
 import com.vaadin.example.hackathon233.views.chat.ChatView;
 import com.vaadin.example.hackathon233.views.credits.CreditsView;
 import com.vaadin.example.hackathon233.views.helloworld.HelloWorldView;
-import com.vaadin.example.hackathon233.views.spreadsheet.SpreadsheetView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
@@ -26,8 +28,6 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.server.auth.AccessAnnotationChecker;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import java.io.ByteArrayInputStream;
-import java.util.Optional;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -79,10 +79,6 @@ public class MainLayout extends AppLayout {
         }
         if (accessChecker.hasAccess(AboutView.class)) {
             nav.addItem(new AppNavItem("About", AboutView.class, "la la-file"));
-
-        }
-        if (accessChecker.hasAccess(SpreadsheetView.class)) {
-            nav.addItem(new AppNavItem("Spreadsheet", SpreadsheetView.class, "la la-file-excel"));
 
         }
         if (accessChecker.hasAccess(CreditsView.class)) {
