@@ -1,4 +1,6 @@
 FROM openjdk:17-jdk-slim
 COPY target/*.jar app.jar
+COPY agent.properties agent.properties
+COPY vaadin-opentelemetry-*.jar vaadin-opentelemetry.jar 
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+ENTRYPOINT ["java", "-javaagent:/vaadin-opentelemetry.jar", "-Dotel.javaagent.configuration-file=/agent.properties", "-jar", "/app.jar"]

@@ -1,5 +1,15 @@
 package com.vaadin.example.hackathon233.views.masterdetail;
 
+import java.util.Optional;
+import java.util.UUID;
+
+import javax.annotation.security.RolesAllowed;
+import javax.persistence.OptimisticLockException;
+
+import org.apache.poi.ss.formula.functions.Finance;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+
 import com.vaadin.example.hackathon233.data.entity.SamplePerson;
 import com.vaadin.example.hackathon233.data.service.SamplePersonService;
 import com.vaadin.example.hackathon233.views.MainLayout;
@@ -26,11 +36,12 @@ import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
-import java.util.Optional;
-import java.util.UUID;
-import javax.annotation.security.RolesAllowed;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
+
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @PageTitle("Master-Detail")
 @Route(value = "master-detail/:samplePersonID?/:action?(edit)", layout = MainLayout.class)
@@ -117,21 +128,38 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
         });
 
         save.addClickListener(e -> {
-            try {
-                if (this.samplePerson == null) {
-                    this.samplePerson = new SamplePerson();
-                }
-                binder.writeBean(this.samplePerson);
-                samplePersonService.update(this.samplePerson);
-                clearForm();
-                refreshGrid();
-                Notification.show("SamplePerson details stored.");
-                UI.getCurrent().navigate(MasterDetailView.class);
-            } catch (ValidationException validationException) {
-                Notification.show("An exception happened while trying to store the samplePerson details.");
-            }
+            save();
         });
 
+    }
+
+    private void save() {
+        Tracer trace = GlobalOpenTelemetry.getTracer("app-instrumentation",
+                "1.0");
+        final Span span = trace.spanBuilder("Saving SamplePerson").startSpan();
+        try {
+            if (this.samplePerson == null) {
+                this.samplePerson = new SamplePerson();
+            }
+            binder.writeBean(this.samplePerson);
+            if (this.samplePerson.getFirstName().startsWith("J")) {
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } 
+            }
+            samplePersonService.update(this.samplePerson);
+            clearForm();
+            refreshGrid();
+            Notification.show("SamplePerson details stored.");
+            UI.getCurrent().navigate(MasterDetailView.class);
+        } catch (ValidationException validationException) {
+            Notification.show("An exception happened while trying to store the samplePerson details.");
+        } finally {
+            span.end();
+        }
     }
 
     @Override

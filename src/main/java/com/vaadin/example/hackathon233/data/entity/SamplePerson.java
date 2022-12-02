@@ -1,11 +1,16 @@
 package com.vaadin.example.hackathon233.data.entity;
 
 import java.time.LocalDate;
+
 import javax.persistence.Entity;
+import javax.persistence.Version;
 import javax.validation.constraints.Email;
 
 @Entity
 public class SamplePerson extends AbstractEntity {
+
+    @Version
+    private Long version;
 
     private String firstName;
     private String lastName;
