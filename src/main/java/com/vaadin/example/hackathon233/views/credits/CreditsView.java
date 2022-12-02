@@ -25,6 +25,7 @@ import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.shared.Tooltip;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
 import com.vaadin.flow.component.spreadsheet.Spreadsheet;
 import com.vaadin.flow.component.textfield.TextField;
@@ -60,13 +61,13 @@ public class CreditsView extends Div implements BeforeEnterObserver {
     private final Button cancel = new Button("Cancel");
     private final Button save = new Button("Save");
     private final Button details = new Button("Details");
-    
+
     private Spreadsheet sheet;
     private SplitLayout splitLayout;
 
     private final BeanValidationBinder<Credit> binder;
-    
-    
+
+
 
     private Credit credit;
 
@@ -85,21 +86,21 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         createEditorLayout(splitLayout);
 
         add(splitLayout);
-        
+
         sheet = createSheet();
 
 
         // Configure Grid
         grid.addColumn("name").setAutoWidth(true);
-        
-		grid.addColumn(new NumberRenderer<>(Credit::getLoan,
-				NumberFormat.getCurrencyInstance(VaadinService.getCurrentRequest().getLocale()))).setAutoWidth(true)
-				.setHeader("loan");
 
-		grid.addColumn("years").setAutoWidth(true);
+        grid.addColumn(new NumberRenderer<>(Credit::getLoan,
+                NumberFormat.getCurrencyInstance(VaadinService.getCurrentRequest().getLocale()))).setAutoWidth(true)
+                .setHeader("loan");
 
-		grid.addColumn(LitRenderer.<Credit>of("<span>${item.percent} %</span>").withProperty("percent",
-				c -> c.getInterest())).setAutoWidth(true).setHeader("interest");
+        grid.addColumn("years").setAutoWidth(true);
+
+        grid.addColumn(LitRenderer.<Credit>of("<span>${item.percent} %</span>").withProperty("percent",
+                c -> c.getInterest())).setAutoWidth(true).setHeader("interest");
         grid.addColumn("date").setAutoWidth(true);
         grid.setItems(query -> creditService.list(
                 PageRequest.of(query.getPage(), query.getPageSize(), VaadinSpringDataHelpers.toSpringDataSort(query)))
@@ -126,18 +127,18 @@ public class CreditsView extends Div implements BeforeEnterObserver {
                 .bind("interest");
 
         binder.bindInstanceFields(this);
-        
+
         cancel.addClickListener(e -> {
             clearForm();
             refreshGrid();
         });
-        
+
         details.addClickListener(e -> {
-        	if (this.credit != null) {
-            	splitLayout.setVisible(false);
-            	add(sheet);
-            	populateSheet();
-        	}
+            if (this.credit != null) {
+                splitLayout.setVisible(false);
+                add(sheet);
+                populateSheet();
+            }
         });
 
         save.addClickListener(e -> {
@@ -156,19 +157,19 @@ public class CreditsView extends Div implements BeforeEnterObserver {
             }
         });
     }
-    
+
     @Override
     protected void onAttach(AttachEvent event) {
         UI.getCurrent().addShortcutListener(e -> {
-        	loan.setValue("" + (int)sheet.getCell(7, 4).getNumericCellValue());
-        	interest.setValue("" + sheet.getCell(8, 4).getNumericCellValue() * 100);
-        	years.setValue("" + (int)sheet.getCell(9, 4).getNumericCellValue());
-        	
-        	splitLayout.setVisible(true);
-        	remove(sheet);
+            loan.setValue("" + (int)sheet.getCell(7, 4).getNumericCellValue());
+            interest.setValue("" + (int)(sheet.getCell(8, 4).getNumericCellValue() * 100));
+            years.setValue("" + (int)sheet.getCell(9, 4).getNumericCellValue());
+
+            splitLayout.setVisible(true);
+            remove(sheet);
         }, Key.ESCAPE);
     }
-    
+
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
         Optional<UUID> creditId = event.getRouteParameters().get(CREDIT_ID).map(UUID::fromString);
@@ -186,37 +187,38 @@ public class CreditsView extends Div implements BeforeEnterObserver {
             }
         }
     }
-    
+
     private Spreadsheet createSheet() {
-    	Spreadsheet sheet = null;
+        Spreadsheet sheet = null;
         try {
             ClassLoader classLoader = getClass().getClassLoader();
             InputStream stream = classLoader.getResourceAsStream("template.xlsx");
-        	sheet = new Spreadsheet(stream);
-        	sheet.setSizeFull();
-        	sheet.createCell(3, 8, "");
-        	sheet.createCell(8, 3, "");
-        	sheet.createCell(13, 6, "");
-        	sheet.createCell(13, 7, "");
+            sheet = new Spreadsheet(stream);
+            sheet.setSheetSelectionBarVisible(false);
+            sheet.setSizeFull();
+            sheet.createCell(3, 8, "");
+            sheet.createCell(8, 3, "");
+            sheet.createCell(13, 6, "");
+            sheet.createCell(13, 7, "");
         } catch (Exception i) {
-        }    	
-    	return sheet;
+        }
+        return sheet;
     }
-    
+
     private void populateSheet() {
-    	try {
-			binder.writeBean(this.credit);
-        	sheet.createCell(5, 1, this.credit.getName());
-        	sheet.createCell(7, 4, this.credit.getLoan().doubleValue());
-        	sheet.createCell(8, 4, this.credit.getInterest() / 100);
-        	sheet.createCell(9, 4, this.credit.getYears().doubleValue());
-//        	LocalDate local = this.credit.getDate();
+        try {
+            binder.writeBean(this.credit);
+            sheet.createCell(5, 1, this.credit.getName());
+            sheet.createCell(7, 4, this.credit.getLoan().doubleValue());
+            sheet.createCell(8, 4, this.credit.getInterest() / 100);
+            sheet.createCell(9, 4, this.credit.getYears().doubleValue());
+//            LocalDate local = this.credit.getDate();
 //            Calendar calendar = Calendar.getInstance();
 //            calendar.clear();
 //            calendar.set(local.getYear(), local.getMonthValue()-1, local.getDayOfMonth());
-//        	sheet.createCell(11, 4, calendar);
-		} catch (ValidationException e1) {
-		}
+//            sheet.createCell(11, 4, calendar);
+        } catch (ValidationException e1) {
+        }
     }
 
     private void createEditorLayout(SplitLayout splitLayout) {
@@ -233,7 +235,12 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         years = new TextField("Years");
         interest = new TextField("Interest");
         date = new DatePicker("Date");
-        formLayout.add(name, loan, years, interest, date);
+
+        Tooltip.forComponent(details)
+                .withText("View in a Spreadsheet")
+                .withPosition(Tooltip.TooltipPosition.BOTTOM);
+
+        formLayout.add(name, loan, years, interest, date, details);
 
         editorDiv.add(formLayout);
         createButtonLayout(editorLayoutDiv);
@@ -246,8 +253,7 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         buttonLayout.setClassName("button-layout");
         cancel.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        details.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
-        buttonLayout.add(save, cancel, details);
+        buttonLayout.add(save, cancel);
         editorLayoutDiv.add(buttonLayout);
     }
 
