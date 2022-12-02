@@ -37,6 +37,9 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.annotation.security.RolesAllowed;
+
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
@@ -77,7 +80,9 @@ public class SpreadsheetView extends VerticalLayout implements Receiver {
     }
 
     @Override
-    public OutputStream receiveUpload(String fileName, String mimeType) {
+    @WithSpan
+    public OutputStream receiveUpload(@SpanAttribute("receive.upload.filename") String fileName,
+                                      @SpanAttribute("receive.upload.mimetype") String mimeType) {
         try {
             File file = new File(fileName);
             file.deleteOnExit();
@@ -89,6 +94,7 @@ public class SpreadsheetView extends VerticalLayout implements Receiver {
         return null;
     }
 
+    @WithSpan
     private MenuBar createMenuBar() {
         MenuBar menuBar = new MenuBar();
 

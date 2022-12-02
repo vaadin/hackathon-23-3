@@ -29,6 +29,8 @@ import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
 import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.security.RolesAllowed;
+
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 
@@ -135,6 +137,7 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
     }
 
     @Override
+    @WithSpan
     public void beforeEnter(BeforeEnterEvent event) {
         Optional<UUID> samplePersonId = event.getRouteParameters().get(SAMPLEPERSON_ID).map(UUID::fromString);
         if (samplePersonId.isPresent()) {
@@ -193,6 +196,7 @@ public class MasterDetailView extends Div implements BeforeEnterObserver {
         wrapper.add(grid);
     }
 
+    @WithSpan
     private void refreshGrid() {
         grid.select(null);
         grid.getDataProvider().refreshAll();
