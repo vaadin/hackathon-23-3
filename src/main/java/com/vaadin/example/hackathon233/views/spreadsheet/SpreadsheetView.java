@@ -1,9 +1,6 @@
 package com.vaadin.example.hackathon233.views.spreadsheet;
 
-import com.vaadin.collaborationengine.CollaborationEngine;
-import com.vaadin.collaborationengine.FormManager;
-import com.vaadin.collaborationengine.PresenceManager;
-import com.vaadin.collaborationengine.UserInfo;
+import com.vaadin.collaborationengine.*;
 import com.vaadin.example.hackathon233.data.entity.User;
 import com.vaadin.example.hackathon233.security.AuthenticatedUser;
 import com.vaadin.example.hackathon233.views.MainLayout;
