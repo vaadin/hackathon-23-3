@@ -1,5 +1,6 @@
 package com.vaadin.example.hackathon233.views.credits;
 
+import java.io.InputStream;
 import java.text.NumberFormat;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import org.springframework.data.domain.PageRequest;
 import com.vaadin.example.hackathon233.data.entity.Credit;
 import com.vaadin.example.hackathon233.data.service.CreditService;
 import com.vaadin.example.hackathon233.views.MainLayout;
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -23,6 +26,7 @@ import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
+import com.vaadin.flow.component.spreadsheet.Spreadsheet;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.BeanValidationBinder;
 import com.vaadin.flow.data.binder.ValidationException;
@@ -55,11 +59,15 @@ public class CreditsView extends Div implements BeforeEnterObserver {
 
     private final Button cancel = new Button("Cancel");
     private final Button save = new Button("Save");
+    private final Button details = new Button("Details");
     
+    private Spreadsheet sheet;
     private SplitLayout splitLayout;
 
     private final BeanValidationBinder<Credit> binder;
     
+    
+
     private Credit credit;
 
     private final CreditService creditService;
@@ -77,6 +85,9 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         createEditorLayout(splitLayout);
 
         add(splitLayout);
+        
+        sheet = createSheet();
+
 
         // Configure Grid
         grid.addColumn("name").setAutoWidth(true);
@@ -121,6 +132,14 @@ public class CreditsView extends Div implements BeforeEnterObserver {
             refreshGrid();
         });
         
+        details.addClickListener(e -> {
+        	if (this.credit != null) {
+            	splitLayout.setVisible(false);
+            	add(sheet);
+            	populateSheet();
+        	}
+        });
+
         save.addClickListener(e -> {
             try {
                 if (this.credit == null) {
@@ -136,6 +155,18 @@ public class CreditsView extends Div implements BeforeEnterObserver {
                 Notification.show("An exception happened while trying to store the credit details.");
             }
         });
+    }
+    
+    @Override
+    protected void onAttach(AttachEvent event) {
+        UI.getCurrent().addShortcutListener(e -> {
+        	loan.setValue("" + (int)sheet.getCell(7, 4).getNumericCellValue());
+        	interest.setValue("" + sheet.getCell(8, 4).getNumericCellValue() * 100);
+        	years.setValue("" + (int)sheet.getCell(9, 4).getNumericCellValue());
+        	
+        	splitLayout.setVisible(true);
+        	remove(sheet);
+        }, Key.ESCAPE);
     }
     
     @Override
@@ -156,7 +187,38 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         }
     }
     
+    private Spreadsheet createSheet() {
+    	Spreadsheet sheet = null;
+        try {
+            ClassLoader classLoader = getClass().getClassLoader();
+            InputStream stream = classLoader.getResourceAsStream("template.xlsx");
+        	sheet = new Spreadsheet(stream);
+        	sheet.setSizeFull();
+        	sheet.createCell(3, 8, "");
+        	sheet.createCell(8, 3, "");
+        	sheet.createCell(13, 6, "");
+        	sheet.createCell(13, 7, "");
+        } catch (Exception i) {
+        }    	
+    	return sheet;
+    }
     
+    private void populateSheet() {
+    	try {
+			binder.writeBean(this.credit);
+        	sheet.createCell(5, 1, this.credit.getName());
+        	sheet.createCell(7, 4, this.credit.getLoan().doubleValue());
+        	sheet.createCell(8, 4, this.credit.getInterest() / 100);
+        	sheet.createCell(9, 4, this.credit.getYears().doubleValue());
+//        	LocalDate local = this.credit.getDate();
+//            Calendar calendar = Calendar.getInstance();
+//            calendar.clear();
+//            calendar.set(local.getYear(), local.getMonthValue()-1, local.getDayOfMonth());
+//        	sheet.createCell(11, 4, calendar);
+		} catch (ValidationException e1) {
+		}
+    }
+
     private void createEditorLayout(SplitLayout splitLayout) {
         Div editorLayoutDiv = new Div();
         editorLayoutDiv.setClassName("editor-layout");
@@ -184,7 +246,8 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         buttonLayout.setClassName("button-layout");
         cancel.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        buttonLayout.add(save, cancel);
+        details.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
+        buttonLayout.add(save, cancel, details);
         editorLayoutDiv.add(buttonLayout);
     }
 
