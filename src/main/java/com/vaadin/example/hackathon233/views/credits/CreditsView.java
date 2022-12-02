@@ -13,8 +13,6 @@ import org.springframework.data.domain.PageRequest;
 import com.vaadin.example.hackathon233.data.entity.Credit;
 import com.vaadin.example.hackathon233.data.service.CreditService;
 import com.vaadin.example.hackathon233.views.MainLayout;
-import com.vaadin.flow.component.AttachEvent;
-import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -28,6 +26,8 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.shared.Tooltip;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
 import com.vaadin.flow.component.spreadsheet.Spreadsheet;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.BeanValidationBinder;
 import com.vaadin.flow.data.binder.ValidationException;
@@ -62,14 +62,15 @@ public class CreditsView extends Div implements BeforeEnterObserver {
 
     private final Button cancel = new Button("Cancel");
     private final Button save = new Button("Save");
-    private final Button details = new Button("Details");
 
     private Spreadsheet sheet;
     private SplitLayout splitLayout;
 
     private final BeanValidationBinder<Credit> binder;
 
-
+    private Tab tabCredits = new Tab("Credits");
+    private Tab tabDetails = new Tab("Details");
+    private TabSheet tabSheet;
 
     private Credit credit;
 
@@ -87,10 +88,25 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         createGridLayout(splitLayout);
         createEditorLayout(splitLayout);
 
-        add(splitLayout);
-
         sheet = createSheet();
 
+        tabSheet = new TabSheet();
+        tabSheet.add(tabCredits, splitLayout);
+        tabSheet.add(tabDetails, sheet);
+        tabSheet.setSizeFull();
+        tabDetails.setEnabled(false);
+
+        Tooltip.forComponent(tabCredits).withText("View all Credits").withPosition(Tooltip.TooltipPosition.BOTTOM);
+        Tooltip.forComponent(tabDetails).withText("View in a Spreadsheet").withPosition(Tooltip.TooltipPosition.BOTTOM);
+
+        tabSheet.addSelectedChangeListener(e -> {
+            if (e.getSelectedTab().equals(tabDetails)) {
+                populateSheet();
+            }
+        });
+
+
+        add(tabSheet);
 
         // Configure Grid
         grid.addColumn("name").setAutoWidth(true);
@@ -135,14 +151,6 @@ public class CreditsView extends Div implements BeforeEnterObserver {
             refreshGrid();
         });
 
-        details.addClickListener(e -> {
-            if (this.credit != null) {
-                splitLayout.setVisible(false);
-                add(sheet);
-                populateSheet();
-            }
-        });
-
         save.addClickListener(e -> {
             try {
                 if (this.credit == null) {
@@ -158,25 +166,15 @@ public class CreditsView extends Div implements BeforeEnterObserver {
                 Notification.show("An exception happened while trying to store the credit details.");
             }
         });
-    }
 
-    @Override
-    protected void onAttach(AttachEvent event) {
-        UI.getCurrent().addShortcutListener(e -> {
-            loan.setValue("" + (int)sheet.getCell(7, 4).getNumericCellValue());
-            interest.setValue("" + (int)(sheet.getCell(8, 4).getNumericCellValue() * 100));
-            years.setValue("" + (int)sheet.getCell(9, 4).getNumericCellValue());
-
-            splitLayout.setVisible(true);
-            remove(sheet);
-        }, Key.ESCAPE);
+        sheet.addCellValueChangeListener(e -> {populateFormFromSheet();});
     }
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-    	if (event.isRefreshEvent()) {
-    		return;
-    	}
+        if (event.isRefreshEvent()) {
+            return;
+        }
         Optional<UUID> creditId = event.getRouteParameters().get(CREDIT_ID).map(UUID::fromString);
         if (creditId.isPresent()) {
             Optional<Credit> creditFromBackend = creditService.get(creditId.get());
@@ -213,17 +211,25 @@ public class CreditsView extends Div implements BeforeEnterObserver {
     private void populateSheet() {
         try {
             binder.writeBean(this.credit);
-            sheet.createCell(5, 1, this.credit.getName());
-            sheet.createCell(7, 4, this.credit.getLoan().doubleValue());
-            sheet.createCell(8, 4, this.credit.getInterest() / 100);
-            sheet.createCell(9, 4, this.credit.getYears().doubleValue());
-//            LocalDate local = this.credit.getDate();
-//            Calendar calendar = Calendar.getInstance();
-//            calendar.clear();
-//            calendar.set(local.getYear(), local.getMonthValue()-1, local.getDayOfMonth());
-//            sheet.createCell(11, 4, calendar);
-        } catch (ValidationException e1) {
+        } catch (ValidationException e) {
+            return;
         }
+        sheet.createCell(5, 1, this.credit.getName());
+        sheet.createCell(7, 4, this.credit.getLoan().doubleValue());
+        sheet.createCell(8, 4, this.credit.getInterest() / 100);
+        sheet.createCell(9, 4, this.credit.getYears().doubleValue());
+//        LocalDate local = this.credit.getDate();
+//        Calendar calendar = Calendar.getInstance();
+//        calendar.clear();
+//        calendar.set(local.getYear(), local.getMonthValue() - 1, local.getDayOfMonth());
+//        sheet.createCell(11, 4, calendar);
+    }
+
+    private void populateFormFromSheet() {
+        loan.setValue("" + (int)sheet.getCell(7, 4).getNumericCellValue());
+        interest.setValue(String.format("%.2g", sheet.getCell(8, 4).getNumericCellValue() * 100));
+        years.setValue("" + (int)sheet.getCell(9, 4).getNumericCellValue());
+
     }
 
     private void createEditorLayout(SplitLayout splitLayout) {
@@ -241,11 +247,7 @@ public class CreditsView extends Div implements BeforeEnterObserver {
         interest = new TextField("Interest");
         date = new DatePicker("Date");
 
-        Tooltip.forComponent(details)
-                .withText("View in a Spreadsheet")
-                .withPosition(Tooltip.TooltipPosition.BOTTOM);
-
-        formLayout.add(name, loan, years, interest, date, details);
+        formLayout.add(name, loan, years, interest, date);
 
         editorDiv.add(formLayout);
         createButtonLayout(editorLayoutDiv);
@@ -276,11 +278,13 @@ public class CreditsView extends Div implements BeforeEnterObserver {
 
     private void clearForm() {
         populateForm(null);
+        tabDetails.setEnabled(false);
     }
 
     private void populateForm(Credit value) {
         this.credit = value;
         binder.readBean(this.credit);
+        tabDetails.setEnabled(true);
 
     }
 }
