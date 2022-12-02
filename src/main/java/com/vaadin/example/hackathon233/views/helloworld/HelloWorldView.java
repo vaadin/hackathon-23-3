@@ -3,8 +3,11 @@ package com.vaadin.example.hackathon233.views.helloworld;
 import com.vaadin.example.hackathon233.views.MainLayout;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -32,6 +35,13 @@ public class HelloWorldView extends HorizontalLayout {
         setVerticalComponentAlignment(Alignment.END, name, sayHello);
 
         add(name, sayHello);
+
+        TabSheet tabSheet = new TabSheet();
+        tabSheet.add("Hello", new Span("Hello"));
+        tabSheet.add("World", new Span("World"));
+
+        add(tabSheet);
+
     }
 
 }

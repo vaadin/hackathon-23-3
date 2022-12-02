@@ -1,20 +1,30 @@
 package com.vaadin.example.hackathon233.views.spreadsheet;
 
+import com.vaadin.collaborationengine.CollaborationEngine;
+import com.vaadin.collaborationengine.FormManager;
+import com.vaadin.collaborationengine.PresenceManager;
+import com.vaadin.collaborationengine.UserInfo;
+import com.vaadin.example.hackathon233.data.entity.User;
+import com.vaadin.example.hackathon233.security.AuthenticatedUser;
 import com.vaadin.example.hackathon233.views.MainLayout;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.avatar.AvatarGroup;
+import com.vaadin.flow.component.avatar.AvatarGroup.AvatarGroupItem;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.contextmenu.HasMenuItems;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.contextmenu.SubMenu;
+import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.spreadsheet.Spreadsheet;
 import com.vaadin.flow.component.spreadsheet.SpreadsheetFilterTable;
@@ -26,26 +36,8 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.StreamRegistration;
 import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.server.VaadinSession;
-import java.awt.Color;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
-import javax.annotation.security.RolesAllowed;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.ClientAnchor;
-import org.apache.poi.ss.usermodel.Comment;
-import org.apache.poi.ss.usermodel.CreationHelper;
-import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Font;
-import org.apache.poi.ss.usermodel.RichTextString;
-import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
@@ -54,23 +46,153 @@ import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.security.PermitAll;
+import java.awt.Color;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+
 @PageTitle("Spreadsheet")
 @Route(value = "spreadsheet", layout = MainLayout.class)
-@RolesAllowed("ADMIN")
+//@RolesAllowed("ADMIN")
+@PermitAll
+@JsModule("./src/spreadsheet.collab.js")
 public class SpreadsheetView extends VerticalLayout implements Receiver {
 
+    private final FormManager formManager;
     private File uploadedFile;
     private File previousFile;
     private final Spreadsheet spreadsheet;
 
-    public SpreadsheetView() {
+    private int myHighlightedRow = -1;
+    private int myHighlightedCell = -1;
+
+    public SpreadsheetView(AuthenticatedUser authenticatedUser) {
         setSizeFull();
+
+        CollaborationEngine collaborationEngine = CollaborationEngine.getInstance();
 
         spreadsheet = new Spreadsheet();
         MenuBar menuBar = createMenuBar();
+        AvatarGroup avatarGroup = new AvatarGroup();
+        HorizontalLayout toolbar = new HorizontalLayout(menuBar, avatarGroup);
+        add(toolbar, spreadsheet);
 
-        add(menuBar, spreadsheet);
+        User user = authenticatedUser.get().get();
+        UserInfo userInfo = new UserInfo(user.getId().toString(), user.getName());
+
+        PresenceManager manager = new PresenceManager(spreadsheet, userInfo, "spreadsheet");
+        manager.markAsPresent(true);
+        manager.setPresenceHandler(context -> {
+            UserInfo connectedUser = context.getUser();
+            AvatarGroupItem avatar = new AvatarGroupItem();
+            avatar.setName(connectedUser.getName());
+            avatar.setAbbreviation(connectedUser.getAbbreviation());
+            avatar.setColorIndex(collaborationEngine.getUserColorIndex(connectedUser));
+            avatarGroup.add(avatar);
+
+            return () -> avatarGroup.remove(avatar);
+        });
+
+        spreadsheet.getElement().executeJs("window.Vaadin.Flow._spreadsheet_collab.init(this)");
+
+        formManager = new FormManager(spreadsheet, userInfo, "spreadsheet");
+        formManager.setHighlightHandler(context -> {
+            int uiIdFromEvent = parseUIIdFromEvent(context.getPropertyName());
+            if (UI.getCurrent().getUIId() != uiIdFromEvent) {
+                UserInfo contextUser = context.getUser();
+                int[] coords = parseCellCoordinatesFromEvent(context.getPropertyName());
+
+                spreadsheet.getElement().executeJs("window.Vaadin.Flow._spreadsheet_collab.onSelect(this, $0, $1, $2, $3, $4)",
+                        contextUser.getId(),
+                        coords[0] + 1,
+                        coords[1] + 1,
+                        contextUser.getColorIndex() % 2 == 0 ? "red" : "green",
+                        contextUser.getName()
+                );
+
+                return () -> {
+                    spreadsheet.getElement().executeJs("window.Vaadin.Flow._spreadsheet_collab.onDeselect(this, $0)", contextUser.getId());
+                };
+            }
+
+            return () -> {
+            };
+        });
+
+
+        formManager.setPropertyChangeHandler(event -> {
+            int uiIdFromEvent = parseUIIdFromEvent(event.getPropertyName());
+            if (UI.getCurrent().getUIId() != uiIdFromEvent) {
+                Object value = event.getValue();
+                int[] coords = parseCellCoordinatesFromEvent(event.getPropertyName());
+
+                Cell cell = spreadsheet.getCell(coords[0], coords[1]);
+                String stringValue = value != null ? value.toString() : null;
+                if (cell == null) {
+                    cell = spreadsheet.createCell(coords[0], coords[1], stringValue);
+                } else {
+                    cell.setCellValue(stringValue);
+                }
+                spreadsheet.refreshCells(cell);
+            } else {
+            }
+
+        });
+
+        spreadsheet.addCellValueChangeListener(event -> {
+            Set<CellReference> changedCells = event.getChangedCells();
+            if (changedCells.size() > 0) {
+                CellReference reference = changedCells.iterator().next();
+                String value = spreadsheet.getCell(reference.getRow(), reference.getCol()).getStringCellValue();
+                formManager.setValue(createEventInfo(reference.getRow(), reference.getCol()), value);
+            }
+        });
+
+        spreadsheet.addSelectionChangeListener(event -> {
+            CellReference reference = event.getSelectedCellReference();
+            if (myHighlightedCell > -1 && myHighlightedRow > -1) {
+                formManager.highlight(createEventInfo(myHighlightedRow, myHighlightedCell), false);
+            }
+
+            if (reference != null) {
+                myHighlightedRow = reference.getRow();
+                myHighlightedCell = reference.getCol();
+
+                formManager.highlight(createEventInfo(myHighlightedRow, myHighlightedCell), true);
+            }
+        });
     }
+
+    private static int[] parseCellCoordinatesFromEvent(String eventInfo) {
+        String[] s = eventInfo.split("_");
+        return new int[]{Integer.parseInt(s[1]), Integer.parseInt(s[2])};
+    }
+
+    private static int parseUIIdFromEvent(String eventInfo) {
+        String[] s = eventInfo.split("_");
+        return Integer.parseInt(s[3]);
+    }
+
+    private static String createEventInfo(int row, int cell) {
+        return "cell_" + row + "_" + cell + "_" + UI.getCurrent().getUIId();
+    }
+
+//    private void removeActiveCell() {
+//        if (myHighlightedCell > -1 && myHighlightedRow > -1) {
+//            formManager.highlight("cell_" + myHighlightedRow + "_" + myHighlightedCell, false);
+//        }
+//
+//        if (null != null) {
+//            myHighlightedRow = ((CellReference) null).getRow();
+//            myHighlightedCell = ((CellReference) null).getCol();
+//
+//            formManager.highlight("cell_" + myHighlightedRow + "_" + myHighlightedCell, true);
+//        }
+//    }
+
 
     private Logger getLogger() {
         return LoggerFactory.getLogger(getClass());
