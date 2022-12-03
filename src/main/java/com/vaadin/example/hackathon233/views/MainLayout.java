@@ -27,6 +27,7 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.server.auth.AccessAnnotationChecker;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import com.vaadin.kubernetes.starter.ui.ClusterSupport;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -58,7 +59,8 @@ public class MainLayout extends AppLayout {
     }
 
     private void addDrawerContent() {
-        H1 appName = new H1("Hackathon-23-3");
+        String version = System.getenv(ClusterSupport.ENV_APP_VERSION);
+        H1 appName = new H1("Hackathon-23-3" + (version != null ? "v" + version : ""));
         appName.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.Margin.NONE);
         Header header = new Header(appName);
 
