@@ -45,11 +45,7 @@ export default function EditView() {
     editedBookmark.title = editedBookmark.title || websiteMetadata?.title || "";
     editedBookmark.description =
       editedBookmark.description || websiteMetadata?.description || "";
-    const bookmarkToSave = {
-      ...(websiteMetadata || {}),
-      ...editedBookmark,
-    };
-    await BookmarkEndpoint.save(bookmarkToSave);
+    await BookmarkEndpoint.save(editedBookmark);
     Notification.show("Bookmark saved", { theme: "primary" });
     navigate("/");
   };
