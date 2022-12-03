@@ -8,7 +8,6 @@ import com.vaadin.example.hackathon233.components.appnav.AppNavItem;
 import com.vaadin.example.hackathon233.data.entity.User;
 import com.vaadin.example.hackathon233.security.AuthenticatedUser;
 import com.vaadin.example.hackathon233.views.about.AboutView;
-import com.vaadin.example.hackathon233.views.chat.ChatView;
 import com.vaadin.example.hackathon233.views.credits.CreditsView;
 import com.vaadin.example.hackathon233.views.helloworld.HelloWorldView;
 import com.vaadin.flow.component.applayout.AppLayout;
@@ -83,10 +82,6 @@ public class MainLayout extends AppLayout {
         }
         if (accessChecker.hasAccess(CreditsView.class)) {
             nav.addItem(new AppNavItem("Credits", CreditsView.class, "la la-columns"));
-
-        }
-        if (accessChecker.hasAccess(ChatView.class)) {
-            nav.addItem(new AppNavItem("Chat", ChatView.class, "la la-comments"));
 
         }
 
