@@ -1,0 +1,19 @@
+.item {
+    display: flex;
+    align-items: center;
+    padding-top: var(--lumo-space-s);
+    padding-bottom: var(--lumo-space-s);
+    border-bottom: solid 1px var(--lumo-contrast-5pct);
+}
+
+.item .content {
+    flex: 1 1 0;
+}
+
+.item .actions {
+    flex: 0 0  auto;
+}
+
+.item .description {
+    color: var(--lumo-secondary-text-color);
+}
