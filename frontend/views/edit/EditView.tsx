@@ -1,40 +1,57 @@
-import { TextField, WebComponentModule as TextFieldWC } from '@hilla/react-components/TextField.js';
-import { useEffect, useState } from 'react';
-import { TextArea } from '@hilla/react-components/TextArea.js';
-import { Button } from '@hilla/react-components/Button.js';
-import { HorizontalLayout } from '@hilla/react-components/HorizontalLayout.js';
-import { BookmarkEndpoint } from 'Frontend/generated/endpoints';
-import Bookmark from 'Frontend/generated/com/example/application/entities/Bookmark';
-import { Notification } from '@hilla/react-components/Notification.js';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import WebsiteMetadata from 'Frontend/generated/com/example/application/utils/WebsiteMetadata';
-import css from './EditView.module.css';
+import {
+  TextField,
+  WebComponentModule as TextFieldWC,
+} from "@hilla/react-components/TextField.js";
+import { useEffect, useState } from "react";
+import { TextArea } from "@hilla/react-components/TextArea.js";
+import { Button } from "@hilla/react-components/Button.js";
+import { HorizontalLayout } from "@hilla/react-components/HorizontalLayout.js";
+import { BookmarkEndpoint } from "Frontend/generated/endpoints";
+import Bookmark from "Frontend/generated/com/example/application/entities/Bookmark";
+import { Notification } from "@hilla/react-components/Notification.js";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import WebsiteMetadata from "Frontend/generated/com/example/application/utils/WebsiteMetadata";
+import css from "./EditView.module.css";
+
+const emptyBookmark: Bookmark = {
+  url: "",
+  title: "",
+  description: "",
+};
 
 export default function EditView() {
-  const [editedBookmark, setEditedBookmark] = useState<Bookmark>({ url: '', title: '', description: '' });
-  const [websiteMetadata, setWebsiteMetadata] = useState<WebsiteMetadata | null>();
+  const [editedBookmark, setEditedBookmark] = useState<Bookmark>(emptyBookmark);
+  const [websiteMetadata, setWebsiteMetadata] =
+    useState<WebsiteMetadata | null>();
   const navigate = useNavigate();
   const params = useParams();
   const bookmarkIdParam = params.id;
 
   useEffect(() => {
     if (bookmarkIdParam) {
-      BookmarkEndpoint.getBookmark(parseInt(bookmarkIdParam)).then((bookmark) => {
-        if (bookmark) {
-          setEditedBookmark(bookmark);
+      BookmarkEndpoint.getBookmark(parseInt(bookmarkIdParam)).then(
+        (bookmark) => {
+          if (bookmark) {
+            setEditedBookmark(bookmark);
+          }
         }
-      });
+      );
+    } else {
+      setEditedBookmark(emptyBookmark);
     }
   }, [bookmarkIdParam]);
 
   const handleSave = async () => {
+    editedBookmark.title = editedBookmark.title || websiteMetadata?.title || "";
+    editedBookmark.description =
+      editedBookmark.description || websiteMetadata?.description || "";
     const bookmarkToSave = {
-      ...editedBookmark,
       ...(websiteMetadata || {}),
+      ...editedBookmark,
     };
     await BookmarkEndpoint.save(bookmarkToSave);
-    Notification.show('Bookmark saved', { theme: 'primary' });
-    navigate('/');
+    Notification.show("Bookmark saved", { theme: "primary" });
+    navigate("/");
   };
 
   const handleUrlChange = (e: Event) => {
@@ -54,7 +71,11 @@ export default function EditView() {
 
   return (
     <div className={css.form}>
-      <TextField label="URL" value={editedBookmark.url} onInput={handleUrlChange}></TextField>
+      <TextField
+        label="URL"
+        value={editedBookmark.url}
+        onInput={handleUrlChange}
+      ></TextField>
       <br />
       <TextField
         label="Title"
