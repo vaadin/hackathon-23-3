@@ -1,0 +1,44 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaadin-deploy-green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      version: green
+  template:
+    metadata:
+      name: vaadin-pod
+      labels:
+        version: green
+    spec:
+      containers:
+        - name: vaadin-app
+          image: dodotis/hackathon-23-3:2.0
+          imagePullPolicy: Always
+          args:
+            - "--spring.datasource.url=jdbc:h2:tcp://db-service:1521/test;USER=sa"
+            - "--com.vaadin.example.hackathon233.auth.secret=18O2/DDp9aVHZXFPyDj6Mx8m5PWRmk5KcHHgRDfNPjc="
+          env:
+            - name: APP_VERSION
+              value: "2.0"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 4
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vaadin-service-green
+spec:
+  selector:
+    version: green
+  ports:
+    - port: 8080
+
