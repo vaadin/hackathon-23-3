@@ -10,7 +10,6 @@ The cell highlighting is done with special html overlay divs.
 
 Known issues:
 - scrolling does not work (highlight overlay will stay in place - sample solution code is in there, but not yet working 100%)
-- z index issues with written cells
 
 You can go to the spreadsheet view. Use "user" and "admin" in two different browser tabs to see the collab effects.
 
